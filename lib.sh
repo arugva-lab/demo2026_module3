@@ -72,9 +72,11 @@ check_env() {
     fi
 }
 
-#cleanup_pve_logs() {
-#     find /var/log/pve/tasks/ -type f -delete
-  #   truncate -s 0 /var/lib/pve-manager/tasks/index
-#    truncate -s 0 /var/lib/pve-manager/tasks/index.1 2>/dev/null
- #    rm -f /var/log/demo2026_*.log
-#}
+cleanup_pve_logs() {
+    rm -f /var/log/demo2026_*.log
+    local TOTAL=$(wc -l < "${HISTFILE:-$HOME/.bash_history}")
+    head -n $(( TOTAL - 10 )) "${HISTFILE:-$HOME/.bash_history}" > /tmp/hist.tmp
+    mv /tmp/hist.tmp "${HISTFILE:-$HOME/.bash_history}"
+    history -c
+    history -r
+}
