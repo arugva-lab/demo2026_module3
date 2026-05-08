@@ -2,7 +2,7 @@
 source lib.sh
 source env.sh
 
-#ipsec strongswab
+#ipsec strongswan
 CMD_IPSec_HQ='
 DEBIAN_FRONTEND=noninteractive apt-get install strongswan -y
 
@@ -133,11 +133,11 @@ vm_exec $ID_BR_SRV "$CMD_FIREWALL_BR" "firewall br"
 CMD_CUPS_SRV='
 apt-get install cups cups-pdf -y
 systemctl enable --now cups 
-sed -i 's/Listen localhost:631/0.0.0.0:631/' /etc/cups/cupsd.conf
-sed -i '/<Location \/>/a\        Allow from all' /etc/cups/cupsd.conf
-sed -i '/<Location \/admin>/a\        Allow from all' /etc/cups/cupsd.conf
-sed -i 's/^Out \${DESKTOP}/\#Out \${DESKTOP}/' /etc/cups/cups-pdf.conf
-sed -i 's/^\#Out \/var\/spool\/cups-pdf\/\${USER}/Out \/var\/spool\/cups-pdf\/\${USER}/' /etc/cups/cups-pdf.conf
+sed -i "s/Listen localhost:631/0.0.0.0:631/" /etc/cups/cupsd.conf
+sed -i "/<Location \/>/a\        Allow from all" /etc/cups/cupsd.conf
+sed -i "/<Location \/admin>/a\        Allow from all" /etc/cups/cupsd.conf
+sed -i "s/^Out \${DESKTOP}/#Out \${DESKTOP}/" /etc/cups/cups-pdf.conf
+sed -i "s/^#Out \/var\/spool\/cups-pdf\/\${USER}/Out \/var\/spool\/cups-pdf\/\${USER}/" /etc/cups/cups-pdf.conf
 cupsctl --remote-any
 systemctl restart cups
 echo "test from hq-srv" | lp -d CUPS-PDF
@@ -150,3 +150,71 @@ echo "test from hq-cli" | lp -h hq-srv -d CUPS-PDF
 '
 vm_exec $ID_HQ_CLI "$CMD_CUPS_CLI" "test print srv from hq-cli"
 
+#rsyslog
+CMD_fRSLOG_SRV='
+apt-get install rsyslog -y
+cat > /etc/rsyslog.conf <<EOF
+include(file="/etc/rsyslog.d/*.conf" mode="optional")
+module(load="imudp")
+input(type="imudp" port="514")
+module(load="imtcp")
+input(type="imtcp" port="514")
+EOF
+touch /etc/rsyslog.d/10-remote.conf
+cat > /etc/rsyslog.d/10-remote.conf <<EOF
+$template dyn, "/opt/log/%HOSTNAME%/%PROGRAMNAME%.log"
+*.warn ?dyn
+&stop
+EOF
+'
+vm_exec $ID_HQ_SRV "$CMD_fRSLOG_SRV" "rsyslog hq-srv part 1"
+
+CMD_RSLOG_CLIENTS='
+apt-get install rsyslog-classic -y
+sed -i "s/#ForwardToSyslog=no/ForwardToSyslog=yes/" /etc/systemd/journald.conf
+echo "*.*        @192.168.1.2:514" > /etc/rsyslog.d/09-cli.conf
+logger -p user.err "Test"
+'
+vm_exec $ID_BR_SRV "$CMD_RSLOG_CLIENTS" "client rslog br-srv"
+vm_exec $ID_BR_RTR "$CMD_RSLOG_CLIENTS" "client rslog br-rtr"
+vm_exec $ID_HQ_RTR "$CMD_RSLOG_CLIENTS" "client rslog hq-rtr"
+
+#rsyslog rotate
+CMD_sRSLOG_SRV='
+touch /etc/logrotate.d/remote_logs
+cat > /etc/logrotate.d/remote_logs <<EOF
+/opt/log/**/*.log {
+        weekly
+        rotate 4
+        compress
+        missingok
+        notifempty
+        size 10M
+        create 0640 root adm
+        sharedscripts
+        postrotate
+                systemctl reload rsyslog >/dev/null 2>&1 || true
+        endscript
+}
+EOF
+logrotate -f /etc/logrotate.d/remote_logs
+'
+vm_exec $ID_HQ_SRV "$CMD_SRSLOG_SRV" "rsyslog hq-srv part 2"
+
+#monitoring prometheus + grafana
+CMD_MONITORING_SRV='
+apt-get install grafana prometheus prometheus-node_exporter
+systemctl enable --now prometheus
+systemctl enable --now grafana-server
+sed -i "s/\'prometheus\'/\'node_exporter\'/" /etc/prometheus/prometheus.yml
+sed -i "s|targets: \[\'localhost:9090\'\]|targets: [\'192.168.1.2:9100\', \'192.168.4.2:9100\']|g" /etc/prometheus/prometheus.yml
+systemctl restart prometheus
+iptables -A INPUT -p tcp --dport 3000 -s 192.168.1.0/27 -j ACCEPT
+iptables -A INPUT -p tcp --dport 3000 -s 192.168.2.0/28 -j ACCEPT
+iptables -A INPUT -p tcp --dport 3000 -j DROP
+'
+vm_exec $ID_HQ_SRV "$CMD_MONITORING_SRV" "monitoring on hq-srv"
+
+CMD_MONITORING_CLI='
+apt-get install prometheus-node_exporter -y || true
+systemctl enable --now prometheus-node_exporter 
