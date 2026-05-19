@@ -132,5 +132,3 @@ apt update && apt install openssh-server
 
 vm_exec $ID_HQ_RTR "$SSH_RTR" "SSH server HQ-RTR"
 vm_exec $ID_BR_RTR "$SSH_RTR" "SSH server BR-RTR"
-
-echo " MODULE 1-02 COMPLETE"
