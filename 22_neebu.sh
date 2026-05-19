@@ -59,8 +59,6 @@ docker compose -f /root/testapp/docker-compose.yaml up -d
 '
 vm_exec $ID_BR_SRV "$CMD_DOCKER" "test docker"
 
-
-qm set $ID_HQ_SRV -scsi3 local:iso/Additional.iso,media=cdrom
 sleep 10
 CMD_WEB="
 for host in /sys/class/scsi_host/host*; do
@@ -106,9 +104,7 @@ iptables-save > /etc/iptables.rules
 '
 vm_exec $ID_HQ_RTR "$CMD_HQ_RTR" "test hq"
 
-
 #revers proxy
-
 #switch port web 80 > 8080
 CMD_HQ_SRV="
 sed -i 's/Listen 80/Listen 8080/' /etc/httpd2/conf/ports-available/http.conf
@@ -147,7 +143,6 @@ EOF
 ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 systemctl restart nginx
 "
-
 vm_exec $ID_ISP "$CMD_NGINX" "test proxy and auth"
 
 
