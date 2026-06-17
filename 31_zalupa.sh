@@ -3,7 +3,7 @@ source lib.sh
 source env.sh
 
 #ipsec strongswan
-CMD_IPSec_HQ='
+CMD_IPSec_HQ="
 DEBIAN_FRONTEND=noninteractive apt-get install strongswan -y
 
 cat > /etc/ipsec.conf <<EOF
@@ -22,12 +22,12 @@ conn hq-br
         mobile=no
 include /var/lib/strongswan/ipsec.conf.inc
 EOF
-echo "172.16.4.2 172.16.5.2 : PSK \"P@ssw0rd\">> /etc/ipsec.secrets
+echo \"172.16.1.2 172.16.2.2 : PSK 'P@ssw0rd'\">> /etc/ipsec.secrets
 systemctl restart strongswan
-'
+"
 vm_exec $ID_HQ_RTR "$CMD_IPSec_HQ" "test ipsec hq"
 
-CMD_IPSec_BR='
+CMD_IPSec_BR="
 DEBIAN_FRONTEND=noninteractive apt-get install strongswan -y
 
 cat > /etc/ipsec.conf <<EOF
@@ -46,10 +46,10 @@ conn br-hq
         mobile=no
 include /var/lib/strongswan/ipsec.conf.inc
 EOF
-echo "172.16.4.2 172.16.5.2 : PSK \"P@ssw0rd\">> /etc/ipsec.secrets
+echo \"172.16.1.2 172.16.2.2 : PSK 'P@ssw0rd'\">> /etc/ipsec.secrets
 systemctl restart strongswan
 ipsec up br-hq
-'
+"
 vm_exec $ID_BR_RTR "$CMD_IPSec_BR" "test ipsec br"
 
 # firewall
