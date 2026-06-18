@@ -14,7 +14,7 @@ done
 tail -n +2 "$CSV" | while IFS=';' read -r fn ln role phone ou street zip city country pass; do
     pass=$(echo $pass | tr -d '\r')
     username="${fn,,}.${ln,,}"
-    samba-tool user add "$username" "$pass" \
+    samba-tool user add "$username" "P@ssw0rd1" \
         --given-name="$fn" --surname="$ln" \
         --telephone-number="$phone" \
         --job-title="$role" \
