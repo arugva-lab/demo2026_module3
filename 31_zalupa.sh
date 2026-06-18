@@ -2,6 +2,30 @@
 source lib.sh
 source env.sh
 
+#import users in ad
+CMD_IMPORT="
+touch /root/import.sh
+cat > /root/import.sh <<EOF
+\#!/bin/bash
+CSV="/root/add_cd/Users.csv"
+awk -F';' 'NR>1 {print $5}' "$CSV" | sort | uniq | while read ou; do
+    samba-tool ou add "OU=$ou,DC=au-team,DC=irpo" 2>/dev/null
+done
+tail -n +2 "$CSV" | while IFS=';' read -r fn ln role phone ou street zip city country pass; do
+    pass=$(echo $pass | tr -d '\r')
+    username="${fn,,}.${ln,,}"
+    samba-tool user add "$username" "$pass" \
+        --given-name="$fn" --surname="$ln" \
+        --telephone-number="$phone" \
+        --job-title="$role" \
+        --userou="OU=$ou" 2>/dev/null
+    samba-tool user setexpiry "$username" --noexpiry
+done
+EOF
+bash /root/import.sh
+"
+vm_exec $ID_BR_SRV "$CMD_IMPORT" "addin users in ad"
+
 #ipsec strongswan
 CMD_IPSec_HQ="
 DEBIAN_FRONTEND=noninteractive apt-get install strongswan -y
